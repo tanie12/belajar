@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nightfall: Social Deduction Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,400;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #0f172a; /* slate-900 */
+        }
+        
+        .font-lore {
+            font-family: 'Merriweather', serif;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        .fade-in {
+            animation: fadeIn 1.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            0% { opacity: 0; transform: translateY(10px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="text-white selection:bg-indigo-500 selection:text-white antialiased">
+    <div id="app"></div>
+
+    <script>
+        // --- LORE & THEMES CONFIGURATION ---
+        const THEMES = {
+            school: {
+                id: 'school',
+                icon: '🏫',
+                name: 'Classroom Sabotage',
+                desc: 'Pranksters are trying to ruin the class final project!',
+                prologue: {
+                    title: "The Final Deadline",
+                    text: "Welcome to Classroom 304. Tomorrow is the deadline for your massive final group project. You've all worked so hard... but a secret group of bitter Pranksters has decided that if they fail, everyone fails. They walk among you right now, pretending to be good students. Trust no one. The bell is about to ring..."
+                },
+                roles: {
+                    bad: { name: 'Prankster', icon: '🃏', color: 'text-red-500', bg: 'bg-red-500', desc: 'Your goal: Sabotage the project! At night, wake up and pick one student to prank and ruin their work.' },
+                    seer: { name: 'The Gossip', icon: '📱', color: 'text-purple-400', bg: 'bg-purple-500', desc: 'Your ability: At night, point at someone. The Host will nod if they are a Prankster, or shake their head if they are not.' },
+                    guardian: { name: 'Class Prefect', icon: '👮', color: 'text-blue-400', bg: 'bg-blue-500', desc: 'Your ability: At night, choose one student to protect. Their project cannot be ruined that night.' },
+                    good: { name: 'Honest Student', icon: '🎒', color: 'text-emerald-400', bg: 'bg-emerald-500', desc: 'Your goal: Finish the project! Find out who the Pranksters are during the day and vote them into detention.' }
+                },
+                narrative: {
+                    night_start: "[READ SLOWLY & MYSTERIOUSLY] The school bell has rung. The sky turns dark and the hallways are empty. Everyone, put your heads down on your desks and close your eyes tight. No peeking...",
+                    bad_turn: "[WHISPERING] Pranksters, open your eyes. Look at each other... Now, point to the poor student whose project you will destroy tonight.",
+                    seer_turn: "[WHISPERING] The Gossip, open your eyes. Who do you suspect the most? Point to someone, and I will reveal their secret...",
+                    guardian_turn: "[WHISPERING] Class Prefect, open your eyes. Who will you keep an eye on and protect tonight? Point to them now...",
+                    day_start: "[LOUD & ENERGETIC] RIIIING! The morning bell rings! The sun is up! Everyone, wake up and open your eyes!",
+                    day_result: "[SAD TONE] This morning, a tragedy struck... We found [Victim's Name / Nobody]'s project completely covered in spilled paint!",
+                    vote: "[FIRM] Class discussion time! Look at your classmates. Who is acting suspicious? Discuss and vote on who we are sending to the Principal's Office!"
+                }
+            },
+            space: {
+                id: 'space',
+                icon: '🚀',
+                name: 'Space Station',
+                desc: 'Deadly Impostors have infiltrated your spaceship crew.',
+                prologue: {
+                    title: "Deep Space Isolation",
+                    text: "You are aboard the Starlight Vanguard, currently 40 light-years away from Earth. Communication with command has been completely severed. You thought you were alone in the void... but alien Impostors have boarded the ship, taking the shape of your crewmates. Oxygen is slowly depleting. The hunt begins."
+                },
+                roles: {
+                    bad: { name: 'Impostor', icon: '👽', color: 'text-red-500', bg: 'bg-red-500', desc: 'Your goal: Take over the ship. At night, wake up and choose a Crewmate to eliminate.' },
+                    seer: { name: 'Scanner', icon: '📡', color: 'text-cyan-400', bg: 'bg-cyan-500', desc: 'Your ability: At night, scan one person. The host will confirm if they are an Impostor.' },
+                    guardian: { name: 'Shield Op', icon: '🔋', color: 'text-blue-400', bg: 'bg-blue-500', desc: 'Your ability: At night, activate a shield on one person to protect them from the Impostor.' },
+                    good: { name: 'Crewmate', icon: '👨‍🚀', color: 'text-emerald-400', bg: 'bg-emerald-500', desc: 'Your goal: Survive. Find the Impostors during discussions and eject them into the airlock.' }
+                },
+                narrative: {
+                    night_start: "[READ COLDLY & TENSELY] Warning: Oxygen systems entering standby mode. Main cabin lights shutting down. All crew members, enter your sleep pods and close your eyes...",
+                    bad_turn: "[WHISPERING] Impostors, open your eyes. Move in silence... Point to the crew member whose oxygen you will sabotage tonight.",
+                    seer_turn: "[WHISPERING] Scanner Officer, open your eyes. Aim your radar at one person. Are they human or alien?",
+                    guardian_turn: "[WHISPERING] Shield Operator, open your eyes. Whose energy shield will you activate tonight to save them?",
+                    day_start: "[LOUD & PANICKED] BEEP! BEEP! Emergency Meeting! Emergency lights are on. All crew, open your eyes right now!",
+                    day_result: "[SERIOUS TONE] Damage report... Last night, [Victim's Name / Nobody] was found floating lifeless near the engine room.",
+                    vote: "[FIRM] Activate discussion protocol. Who is acting like an alien? Vote now to eject the suspect out of the airlock!"
+                }
+            },
+            werewolf: {
+                id: 'werewolf',
+                icon: '🐺',
+                name: 'Classic Werewolf',
+                desc: 'An isolated village terrorized by the Werewolf curse.',
+                prologue: {
+                    title: "The Blood Moon",
+                    text: "The secluded village of Oakhaven has lived in peace for centuries. But as the Blood Moon rises, an ancient curse awakens. Monsters are hiding in human skin, living among you as your friends and neighbors. By day, they smile. By night, they hunt. Will the village survive the coming dawn?"
+                },
+                roles: {
+                    bad: { name: 'Werewolf', icon: '🐺', color: 'text-red-500', bg: 'bg-red-500', desc: 'Your goal: Don\'t get caught! At night, wake up and agree on a villager to eliminate.' },
+                    seer: { name: 'Seer', icon: '👁️', color: 'text-purple-400', bg: 'bg-purple-500', desc: 'Your ability: At night, point at one person. The host will tell you if they are a Werewolf.' },
+                    guardian: { name: 'Guardian', icon: '🛡️', color: 'text-blue-400', bg: 'bg-blue-500', desc: 'Your ability: At night, point at one person to protect from the Werewolf.' },
+                    good: { name: 'Villager', icon: '👨‍🌾', color: 'text-emerald-400', bg: 'bg-emerald-500', desc: 'Your goal: Find the Werewolves hiding among you during the day and vote to hang them.' }
+                },
+                narrative: {
+                    night_start: "[READ SLOWLY & EERILY] Night falls over the village. The full moon shines dimly behind the clouds. All villagers, go into your homes, lock the doors, and close your eyes...",
+                    bad_turn: "[WHISPERING & SLY] Werewolves... open your eyes. The hunt begins. Point to the poor villager who will become your feast tonight.",
+                    seer_turn: "[WHISPERING] The Seer, open your inner eye. Point to one soul so you may see their true, monstrous or innocent nature...",
+                    guardian_turn: "[WHISPERING] The Guardian, open your eyes. Whose life will you protect with your magical shield tonight?",
+                    day_start: "[CALM THEN SUDDENLY LOUD] A rooster crows... Dawn breaks over the village. Everyone, open your eyes and step out of your homes!",
+                    day_result: "[DRAMATIC TONE] Blood stains the village square... Last night, [Victim's Name / Nobody] fell victim to the savage beasts.",
+                    vote: "[FIRM] Villagers, we cannot stay silent! Discuss who looks guilty, and vote on who we shall hang this afternoon!"
+                }
+            }
+        };
+
+        // --- GLOBAL STATE ---
+        let gameState = 'setup'; // setup, prologue, pass, reveal, host_transition, host_dashboard
+        let activeTheme = 'werewolf';
+        let roleCounts = { bad: 2, seer: 1, guardian: 1, good: 6 };
+        let players = [];
+        let currentPlayer = 0;
+        let showRolesHost = true;
+        let round = 1;
+        let phase = 'Night'; // Night / Day
+
+        // --- STATE MUTATION FUNCTIONS ---
+        function changeTheme(themeId) { activeTheme = themeId; render(); }
+        
+        function changeRoleCount(roleKey, delta) {
+            roleCounts[roleKey] = Math.max(0, roleCounts[roleKey] + delta);
+            render();
+        }
+
+        function startGame() {
+            const totalPlayers = Object.values(roleCounts).reduce((a, b) => a + b, 0);
+            if (totalPlayers < 3) {
+                alert("You need at least 3 players to start!");
+                return;
+            }
+
+            let roleDeck = [];
+            Object.entries(roleCounts).forEach(([key, count]) => {
+                for (let i = 0; i < count; i++) { roleDeck.push(key); }
+            });
+
+            roleDeck = roleDeck.sort(() => Math.random() - 0.5); // Shuffle
+
+            players = roleDeck.map((roleKey, index) => ({
+                id: index + 1,
+                name: `Player ${index + 1}`,
+                roleKey: roleKey,
+                isAlive: true
+            }));
+
+            currentPlayer = 0;
+            gameState = 'prologue'; // Go to Prologue first!
+            round = 1;
+            phase = 'Night';
+            render();
+        }
+
+        function startPassing() { gameState = 'pass'; render(); }
+
+        function showRole() { gameState = 'reveal'; render(); }
+
+        function hideAndNext() {
+            if (currentPlayer + 1 < players.length) {
+                currentPlayer++;
+                gameState = 'pass';
+            } else {
+                gameState = 'host_transition';
+            }
+            render();
+        }
+
+        function openDashboard() { gameState = 'host_dashboard'; render(); }
+        function toggleRoles() { showRolesHost = !showRolesHost; render(); }
+        
+        function togglePhase() {
+            if (phase === 'Night') {
+                phase = 'Day';
+            } else {
+                phase = 'Night';
+                round++;
+            }
+            render();
+        }
+
+        function togglePlayerLife(playerId) {
+            players = players.map(p => p.id === playerId ? { ...p, isAlive: !p.isAlive } : p);
+            render();
+        }
+
+        function resetGame() { gameState = 'setup'; render(); }
+
+        // --- RENDER ENGINE ---
+        function render() {
+            const appDiv = document.getElementById('app');
+            const themeData = THEMES[activeTheme];
+            const totalPlayers = Object.values(roleCounts).reduce((a, b) => a + b, 0);
+
+            if (gameState === 'setup') {
+                appDiv.innerHTML = `
+                <div class="min-h-screen flex flex-col items-center justify-center py-10 px-4">
+                    <div class="max-w-5xl w-full bg-slate-800/80 backdrop-blur-md rounded-3xl shadow-2xl p-10 border border-slate-700 fade-in">
+                        <div class="text-center mb-10">
+                            <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400 mb-3 tracking-tight">Nightfall</h1>
+                            <p class="text-slate-400 text-lg font-medium">Immersive Social Deduction Game</p>
+                        </div>
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                            <!-- Theme Selector -->
+                            <div class="space-y-4">
+                                <h3 class="text-slate-300 font-bold mb-4 text-sm uppercase tracking-wider flex items-center gap-2">
+                                    <span class="w-6 h-1 bg-indigo-500 rounded"></span> Select a Story Theme
+                                </h3>
+                                <div class="grid grid-cols-1 gap-4">
+                                    ${Object.values(THEMES).map(theme => `
+                                        <button onclick="changeTheme('${theme.id}')" class="group flex items-center text-left p-5 rounded-2xl border-2 transition-all duration-300 ${activeTheme === theme.id ? 'border-indigo-500 bg-indigo-500/10 shadow-[0_0_20px_rgba(99,102,241,0.2)] transform scale-[1.02]' : 'border-slate-700 bg-slate-800/50 hover:border-slate-500'}">
+                                            <div class="text-5xl mr-5 transition-transform group-hover:scale-110">${theme.icon}</div>
+                                            <div>
+                                                <h4 class="font-extrabold text-xl ${activeTheme === theme.id ? 'text-indigo-300' : 'text-slate-200'}">${theme.name}</h4>
+                                                <p class="text-sm text-slate-400 mt-1 leading-relaxed">${theme.desc}</p>
+                                            </div>
+                                        </button>
+                                    `).join('')}
+                                </div>
+                            </div>
+                            <!-- Role Setup -->
+                            <div class="flex flex-col justify-between">
+                                <div>
+                                    <div class="flex justify-between items-end mb-4">
+                                        <h3 class="text-slate-300 font-bold text-sm uppercase tracking-wider flex items-center gap-2">
+                                            <span class="w-6 h-1 bg-cyan-500 rounded"></span> Configure Roles
+                                        </h3>
+                                        <span class="bg-indigo-500/20 text-indigo-300 px-4 py-1.5 rounded-full text-sm font-bold border border-indigo-500/30">${totalPlayers} Players</span>
+                                    </div>
+                                    <div class="space-y-3 mb-8">
+                                        ${Object.entries(roleCounts).map(([key, count]) => {
+                                            const roleDef = themeData.roles[key];
+                                            return `
+                                            <div class="flex items-center justify-between bg-slate-900/50 p-4 rounded-2xl border border-slate-700/50 hover:border-slate-600 transition-colors">
+                                                <div class="flex items-center gap-4">
+                                                    <span class="text-3xl drop-shadow-md">${roleDef.icon}</span>
+                                                    <span class="font-bold text-lg text-slate-200">${roleDef.name}</span>
+                                                </div>
+                                                <div class="flex items-center gap-4">
+                                                    <button onclick="changeRoleCount('${key}', -1)" class="w-10 h-10 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded-full font-bold text-slate-300 transition-colors text-xl shadow-inner">-</button>
+                                                    <span class="w-8 text-center font-bold text-2xl text-white">${count}</span>
+                                                    <button onclick="changeRoleCount('${key}', 1)" class="w-10 h-10 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded-full font-bold text-slate-300 transition-colors text-xl shadow-inner">+</button>
+                                                </div>
+                                            </div>`;
+                                        }).join('')}
+                                    </div>
+                                </div>
+                                <button onclick="startGame()" class="w-full bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white font-extrabold py-5 rounded-2xl text-xl shadow-lg shadow-indigo-500/30 transition-all transform hover:-translate-y-1 ring-4 ring-indigo-500/20">Begin the Story</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }
+
+            else if (gameState === 'prologue') {
+                appDiv.innerHTML = `
+                <div class="min-h-screen flex flex-col items-center justify-center p-6 text-center bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 via-indigo-950 to-slate-900">
+                    <div class="max-w-4xl w-full bg-slate-900/80 backdrop-blur-xl rounded-3xl p-16 border border-indigo-500/30 shadow-[0_0_40px_rgba(99,102,241,0.2)] relative overflow-hidden fade-in">
+                        
+                        <div class="text-8xl mb-8 drop-shadow-2xl animate-pulse relative z-10">${themeData.icon}</div>
+                        <h2 class="text-xl mb-4 text-indigo-400 font-bold tracking-[0.2em] uppercase relative z-10">Prologue</h2>
+                        <h1 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-indigo-200 mb-10 font-lore relative z-10">
+                            ${themeData.prologue.title}
+                        </h1>
+                        
+                        <div class="mb-14 relative z-10">
+                            <p class="text-slate-300 font-lore text-2xl leading-loose italic max-w-3xl mx-auto drop-shadow-md">
+                                "${themeData.prologue.text}"
+                            </p>
+                            <p class="text-sm font-sans text-indigo-400 font-bold mt-8 uppercase tracking-widest bg-indigo-900/40 inline-block px-4 py-2 rounded-full border border-indigo-500/30">Host: Read this aloud to the players</p>
+                        </div>
+                        
+                        <button onclick="startPassing()" class="w-full max-w-xl mx-auto block relative z-10 bg-indigo-600 hover:bg-indigo-500 text-white font-black py-5 rounded-2xl text-2xl transition-transform transform hover:scale-[1.02] shadow-[0_0_30px_rgba(79,70,229,0.4)] ring-2 ring-indigo-400/50">
+                            We are ready. Begin the Game.
+                        </button>
+                    </div>
+                </div>`;
+            }
+
+            else if (gameState === 'pass') {
+                appDiv.innerHTML = `
+                <div class="min-h-screen flex flex-col items-center justify-center p-6 text-center bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-800 to-slate-900">
+                    <div class="max-w-2xl w-full bg-slate-800/90 backdrop-blur-xl rounded-3xl p-12 border border-slate-600 shadow-2xl relative overflow-hidden fade-in">
+                        <div class="text-8xl mb-8 animate-bounce drop-shadow-2xl relative z-10">💻</div>
+                        <h2 class="text-2xl mb-3 text-slate-400 font-semibold tracking-wide relative z-10">Turn the screen to</h2>
+                        <h1 class="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 mb-10 relative z-10">${players[currentPlayer].name}</h1>
+                        <div class="bg-red-500/10 border border-red-500/30 p-5 rounded-2xl mb-10 relative z-10">
+                            <p class="text-red-400 font-bold text-lg animate-pulse">⚠️ Ensure no one else is looking at the screen!</p>
+                        </div>
+                        <button onclick="showRole()" class="w-full relative z-10 bg-white text-slate-900 hover:bg-slate-200 font-black py-5 rounded-2xl text-2xl transition-transform transform hover:scale-[1.02] shadow-xl">I am ${players[currentPlayer].name}, Reveal My Role</button>
+                    </div>
+                </div>`;
+            }
+
+            else if (gameState === 'reveal') {
+                const player = players[currentPlayer];
+                const roleInfo = themeData.roles[player.roleKey];
+                
+                appDiv.innerHTML = `
+                <div class="min-h-screen flex flex-col items-center justify-center p-6 text-center">
+                    <div class="max-w-3xl w-full bg-slate-800/90 backdrop-blur-xl rounded-3xl p-12 border border-slate-600 shadow-2xl relative overflow-hidden fade-in">
+                        <div class="absolute -top-32 -left-32 w-96 h-96 ${roleInfo.bg} opacity-20 blur-[100px] rounded-full pointer-events-none"></div>
+                        <h2 class="text-lg font-extrabold text-slate-500 mb-10 uppercase tracking-widest relative z-10">Your Secret Role</h2>
+                        <div class="mb-12 relative z-10 flex flex-col items-center">
+                            <div class="text-9xl mb-8 drop-shadow-2xl transform scale-110">${roleInfo.icon}</div>
+                            <h1 class="text-6xl font-black mb-6 ${roleInfo.color} drop-shadow-lg tracking-tight">${roleInfo.name}</h1>
+                            <div class="bg-slate-900/80 p-8 rounded-2xl border border-slate-700/80 backdrop-blur-md max-w-xl shadow-inner">
+                                <p class="text-slate-200 leading-relaxed text-xl font-medium">${roleInfo.desc}</p>
+                            </div>
+                        </div>
+                        <button onclick="hideAndNext()" class="w-full max-w-xl mx-auto block relative z-10 bg-slate-700 hover:bg-slate-600 text-white font-extrabold py-5 rounded-2xl text-xl transition-all shadow-lg ring-2 ring-white/10 hover:ring-white/30">Hide & ${currentPlayer + 1 < players.length ? 'Pass to Next Player' : 'Return to Game Master'}</button>
+                    </div>
+                </div>`;
+            }
+
+            else if (gameState === 'host_transition') {
+                appDiv.innerHTML = `
+                <div class="min-h-screen flex flex-col items-center justify-center p-6 text-center bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-900/50 to-slate-900">
+                    <div class="max-w-3xl w-full bg-indigo-900/40 backdrop-blur-xl rounded-3xl p-12 border border-indigo-500/50 shadow-[0_0_50px_rgba(99,102,241,0.3)] relative overflow-hidden fade-in">
+                        <div class="text-9xl mb-8 drop-shadow-2xl animate-pulse">🎙️</div>
+                        <h1 class="text-5xl font-black mb-6 text-white tracking-tight">All Roles Distributed!</h1>
+                        <p class="text-indigo-200 mb-12 text-xl leading-relaxed font-medium">Please return this laptop back to the<br><b class="text-white text-2xl">Game Master (Host)</b>.<br><span class="text-red-400 text-base mt-2 block">Regular players MUST NOT see the next screen!</span></p>
+                        <button onclick="openDashboard()" class="w-full max-w-xl mx-auto block bg-indigo-600 hover:bg-indigo-500 text-white font-black py-5 rounded-2xl text-2xl shadow-[0_0_30px_rgba(79,70,229,0.5)] transition-transform transform hover:scale-[1.03]">I am the Host, Open Dashboard</button>
+                    </div>
+                </div>`;
+            }
+
+            else if (gameState === 'host_dashboard') {
+                const badAlive = players.filter(p => p.isAlive && p.roleKey === 'bad').length;
+                const goodAlive = players.filter(p => p.isAlive && p.roleKey !== 'bad').length;
+
+                // --- LORE NARRATOR SCRIPT TEMPLATES ---
+                const nightScriptHTML = `
+                    <div class="space-y-7 font-lore">
+                        <div class="bg-indigo-950/50 p-4 rounded-xl border border-indigo-500/30">
+                            <p class="text-xl font-bold text-amber-300 italic text-center drop-shadow-md">"${themeData.narrative.night_start}"</p>
+                        </div>
+                        <div class="pl-4 border-l-4 border-indigo-500/50 space-y-6">
+                            <div>
+                                <p class="text-lg font-bold text-white leading-relaxed">1. "${themeData.narrative.bad_turn}"</p>
+                                <p class="text-sm text-indigo-300 mt-2 font-sans flex items-center gap-2">👉 <span class="bg-slate-800 px-2 py-1 rounded">Host Instruction: See who they point at. Memorize the target.</span></p>
+                            </div>
+                            <div>
+                                <p class="text-lg font-bold text-white leading-relaxed">2. "${themeData.narrative.seer_turn}"</p>
+                                <p class="text-sm text-indigo-300 mt-2 font-sans flex items-center gap-2">👉 <span class="bg-slate-800 px-2 py-1 rounded">Host Instruction: Nod (Yes) if the target is a ${themeData.roles.bad.name}. Shake head (No) if they are not.</span></p>
+                            </div>
+                            <div>
+                                <p class="text-lg font-bold text-white leading-relaxed">3. "${themeData.narrative.guardian_turn}"</p>
+                                <p class="text-sm text-indigo-300 mt-2 font-sans flex items-center gap-2">👉 <span class="bg-slate-800 px-2 py-1 rounded">Host Instruction: This target is INVINCIBLE tonight. If they were targeted in step 1, nobody dies tomorrow.</span></p>
+                            </div>
+                        </div>
+                    </div>`;
+
+                const dayScriptHTML = `
+                    <div class="space-y-7 font-lore">
+                        <div class="bg-amber-950/50 p-4 rounded-xl border border-amber-500/30">
+                            <p class="text-xl font-bold text-yellow-300 italic text-center drop-shadow-md">"${themeData.narrative.day_start}"</p>
+                        </div>
+                        <div class="pl-4 border-l-4 border-amber-500/50 space-y-6">
+                            <div>
+                                <p class="text-lg font-bold text-white leading-relaxed">1. "${themeData.narrative.day_result}"</p>
+                                <p class="text-sm text-amber-300 mt-2 font-sans flex items-center gap-2">👉 <span class="bg-slate-800 px-2 py-1 rounded">Host Instruction: Announce the victim's name. Click "Eliminate" on their card on the right panel.</span></p>
+                            </div>
+                            <div>
+                                <p class="text-lg font-bold text-white leading-relaxed">2. "${themeData.narrative.vote}"</p>
+                                <p class="text-sm text-amber-300 mt-2 font-sans flex items-center gap-2">👉 <span class="bg-slate-800 px-2 py-1 rounded">Host Instruction: Give them 3-5 mins to debate. Once a majority vote is cast, Eliminate that person.</span></p>
+                            </div>
+                        </div>
+                    </div>`;
+
+                appDiv.innerHTML = `
+                <div class="min-h-screen bg-slate-950 p-8 pb-24 fade-in">
+                    <div class="max-w-[90rem] mx-auto">
+                        <!-- Header Dashboard -->
+                        <div class="flex justify-between items-center mb-8 bg-slate-900/80 backdrop-blur-xl p-5 rounded-3xl border border-slate-700/80 sticky top-4 z-30 shadow-2xl">
+                            <div class="flex items-center gap-5">
+                                <div class="text-5xl bg-slate-800 p-3 rounded-2xl shadow-inner">${themeData.icon}</div>
+                                <div>
+                                    <h1 class="text-3xl font-black text-white tracking-tight flex items-center gap-3">
+                                        Game Master Dashboard
+                                    </h1>
+                                    <div class="flex items-center gap-3 text-sm text-slate-400 mt-1">
+                                        <span class="font-black text-indigo-400 text-base bg-indigo-500/10 px-3 py-1 rounded-lg">Round ${round}</span>
+                                        <span class="text-base font-black px-3 py-1 rounded-lg ${phase === 'Night' ? 'bg-blue-500/20 text-blue-400' : 'bg-amber-500/20 text-amber-400'}">${phase} Phase</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <button onclick="toggleRoles()" class="bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-xl text-lg font-bold transition-all border border-slate-600 shadow-md flex items-center gap-3 active:scale-95">
+                                ${showRolesHost ? '👁️ Hide Roles (Safe from peeking)' : '🙈 Reveal Player Roles'}
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                            
+                            <!-- Left Column: Narrator Script & Control -->
+                            <div class="lg:col-span-5 flex flex-col gap-6">
+                                <!-- Stats Bar -->
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="flex flex-col justify-center items-center bg-red-950/30 border border-red-500/30 p-4 rounded-2xl shadow-inner">
+                                        <span class="text-xs text-red-400 font-bold uppercase tracking-widest mb-1 text-center">Evil Team (Alive)</span>
+                                        <div class="text-4xl font-black text-red-500 flex items-center gap-2">${badAlive} <span class="text-2xl">${themeData.roles.bad.icon}</span></div>
+                                    </div>
+                                    <div class="flex flex-col justify-center items-center bg-emerald-950/30 border border-emerald-500/30 p-4 rounded-2xl shadow-inner">
+                                        <span class="text-xs text-emerald-400 font-bold uppercase tracking-widest mb-1 text-center">Good Team (Alive)</span>
+                                        <div class="text-4xl font-black text-emerald-500 flex items-center gap-2">${goodAlive} <span class="text-2xl">${themeData.roles.good.icon}</span></div>
+                                    </div>
+                                </div>
+
+                                <!-- The Script Box -->
+                                <div class="p-8 rounded-3xl border transition-all duration-700 shadow-2xl flex-1 relative overflow-hidden ${phase === 'Night' ? 'bg-gradient-to-b from-slate-900 to-indigo-950 border-indigo-500/50 shadow-indigo-900/20' : 'bg-gradient-to-b from-slate-900 to-amber-950 border-amber-500/50 shadow-amber-900/20'}">
+                                    <!-- Decorative watermark -->
+                                    <div class="absolute -right-10 -bottom-10 text-[15rem] opacity-5 pointer-events-none ${phase === 'Night' ? 'text-indigo-400' : 'text-amber-400'}">
+                                        ${phase === 'Night' ? '🌙' : '☀️'}
+                                    </div>
+
+                                    <div class="flex flex-col gap-5 mb-8 relative z-10">
+                                        <h3 class="font-black text-2xl flex items-center justify-center gap-3 pb-4 border-b border-white/10 ${phase === 'Night' ? 'text-indigo-300' : 'text-amber-300'}">
+                                            📜 Narrator's Script (${phase})
+                                        </h3>
+                                        <button onclick="togglePhase()" class="w-full py-5 rounded-2xl font-black text-xl shadow-xl transition-all transform hover:scale-[1.02] active:scale-95 ring-2 ring-offset-2 ring-offset-transparent ${phase === 'Night' ? 'bg-amber-500 hover:bg-amber-400 text-slate-900 shadow-amber-500/30 ring-amber-500/50' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30 ring-indigo-500/50'}">
+                                            Proceed to ${phase === 'Night' ? 'Day ☀️' : 'Night 🌙'} Script
+                                        </button>
+                                    </div>
+                                    <div class="relative z-10">
+                                        ${phase === 'Night' ? nightScriptHTML : dayScriptHTML}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Right Column: Player Grid Control -->
+                            <div class="lg:col-span-7 bg-slate-900/60 p-8 rounded-3xl border border-slate-700 shadow-inner">
+                                <div class="mb-6 flex items-center justify-between pb-4 border-b border-slate-700">
+                                    <h3 class="text-xl font-black text-slate-300 uppercase tracking-widest flex items-center gap-2">
+                                        🎮 Player Status
+                                    </h3>
+                                    <span class="text-sm font-semibold text-slate-500">Click Eliminate when a player dies</span>
+                                </div>
+                                <div class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                                    ${players.map(p => {
+                                        const rDef = themeData.roles[p.roleKey];
+                                        const roleDisplay = showRolesHost 
+                                            ? `<div class="flex items-center gap-3 bg-slate-900/80 p-3 rounded-xl border border-slate-600/50 shadow-inner"><span class="text-3xl">${rDef.icon}</span><span class="text-sm font-bold uppercase tracking-wider ${rDef.color}">${rDef.name}</span></div>`
+                                            : `<div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/50 text-center shadow-inner h-[60px] flex items-center justify-center"><span class="text-xs text-slate-500 uppercase tracking-widest font-bold">Hidden</span></div>`;
+                                        
+                                        return `
+                                        <div class="p-5 rounded-2xl border flex flex-col gap-5 justify-between transition-all duration-300 ${p.isAlive ? 'bg-slate-800/80 border-slate-600 shadow-lg hover:border-slate-400 hover:shadow-xl' : 'bg-slate-950/80 border-red-900/30 opacity-60 grayscale-[70%]'}">
+                                            <div>
+                                                <h3 class="font-black text-2xl mb-3 truncate ${p.isAlive ? 'text-white' : 'text-slate-600 line-through decoration-red-500 decoration-4'}">${p.name}</h3>
+                                                ${roleDisplay}
+                                            </div>
+                                            <button onclick="togglePlayerLife(${p.id})" class="w-full py-4 rounded-xl text-sm font-black uppercase tracking-widest transition-all shadow-md active:scale-95 ${p.isAlive ? 'bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/30' : 'bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700'}">
+                                                ${p.isAlive ? '☠️ Eliminate' : '✨ Revive'}
+                                            </button>
+                                        </div>`;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-16 text-center">
+                            <button onclick="resetGame()" class="text-slate-500 hover:text-white font-bold text-lg transition-colors border-2 border-transparent hover:border-slate-700 px-8 py-4 rounded-full">
+                                End Game & Return to Main Menu
+                            </button>
+                        </div>
+                    </div>
+                </div>`;
+            }
+        }
+
+        // Initialize App
+        render();
+    </script>
+</body>
+</html>
